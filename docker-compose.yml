@@ -33,7 +33,7 @@ services:
     command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "8000:8000"
 
     environment:
       - DB_HOST=${DB_HOST:-mariadb.fritz.box}
