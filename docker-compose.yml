@@ -5,6 +5,7 @@ services:
     image: ghcr.io/skoelle/calender_sync:latest
     container_name: calendar-sync
     restart: unless-stopped
+    command: ["python", "sync.py"]
 
     environment:
       - ICS_URL=${ICS_URL}
@@ -21,6 +22,26 @@ services:
       - WINDOW_FUTURE_DAYS=${WINDOW_FUTURE_DAYS:-365}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - HEALTHCHECK_URL=${HEALTHCHECK_URL:-}
+
+    networks:
+      - docker-backend
+
+  calendar-api:
+    image: ghcr.io/skoelle/calender_sync:latest
+    container_name: calendar-api
+    restart: unless-stopped
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+    environment:
+      - DB_HOST=${DB_HOST:-mariadb.fritz.box}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-calendar_sync}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
 
     labels:
       - "com.centurylinklabs.watchtower.enable=true"

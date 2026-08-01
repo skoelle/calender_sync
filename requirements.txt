@@ -2,3 +2,6 @@ requests==2.32.3
 icalendar==6.1.0
 recurring-ical-events==3.4.1
 mysql-connector-python==9.1.0
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+jinja2==3.1.4
