@@ -20,6 +20,7 @@ services:
       - WINDOW_PAST_DAYS=${WINDOW_PAST_DAYS:-90}
       - WINDOW_FUTURE_DAYS=${WINDOW_FUTURE_DAYS:-365}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - HEALTHCHECK_URL=${HEALTHCHECK_URL:-}
 
     labels:
       - "com.centurylinklabs.watchtower.enable=true"

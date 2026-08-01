@@ -36,6 +36,7 @@ SYNC_INTERVAL_MINUTES = int(os.environ.get("SYNC_INTERVAL_MINUTES", "15"))
 WINDOW_PAST_DAYS = int(os.environ.get("WINDOW_PAST_DAYS", "90"))
 WINDOW_FUTURE_DAYS = int(os.environ.get("WINDOW_FUTURE_DAYS", "365"))
 CALENDAR_LABEL = os.environ.get("CALENDAR_LABEL", "default")
+HEALTHCHECK_URL = os.environ.get("HEALTHCHECK_URL", "")
 
 
 DB_BOOTSTRAP = os.environ.get("DB_BOOTSTRAP", "false").lower() == "true"
@@ -206,6 +207,16 @@ def mark_missing_as_deleted(cur, calendar_label, run_ts, window_start, window_en
     return cur.rowcount
 
 
+def ping_healthcheck():
+    if not HEALTHCHECK_URL:
+        return
+    try:
+        resp = requests.get(HEALTHCHECK_URL, timeout=10)
+        log.info("Healthcheck ping: %d", resp.status_code)
+    except Exception:
+        log.warning("Healthcheck ping fehlgeschlagen", exc_info=True)
+
+
 def run_sync_once():
     run_ts = datetime.utcnow().replace(microsecond=0)
     window_start = run_ts - timedelta(days=WINDOW_PAST_DAYS)
@@ -227,6 +238,7 @@ def run_sync_once():
         conn.commit()
         cur.close()
         log.info("Sync fertig. %d Events als geloescht markiert.", deleted_count)
+        ping_healthcheck()
     except MySQLError:
         conn.rollback()
         log.exception("DB-Fehler beim Sync, Rollback ausgefuehrt")
