@@ -39,4 +39,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  cleanup-old-images:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete old, untagged image versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          min-versions-to-keep: 4
+          delete-only-untagged-versions: true
 
