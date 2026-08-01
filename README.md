@@ -11,6 +11,8 @@ Läuft als Docker Container, pollt periodisch einen privaten Google Calendar ICS
 - Soft-Delete: Entfernte Events werden als `deleted=1` markiert, nicht gelöscht
 - Optionales Database-Bootstrap: Erstellt DB und User automatisch bei `DB_BOOTSTRAP=true`
 - Zeitfenster-konfiguration für Vergangenheit/Future (standardmäßig -90 Tage / +365 Tage)
+- Web-UI zur Anzeige anstehender Termine mit Suchfunktion
+- REST API für programmsprachigen Zugriff auf Kalenderdaten
 
 ## Voraussetzungen
 
@@ -91,6 +93,53 @@ Tabelle `calendar_events`:
 | `last_seen_at` | DATETIME | Letzte Synchronisation |
 | `created_at` | DATETIME | Erstellungszeitpunkt |
 | `updated_at` | DATETIME | Letzte Änderung |
+
+## Web-UI & API
+
+Das Projekt enthält eine FastAPI-basierte Webanwendung die als separater Container (`calendar-api`) läuft und auf Port `8000` erreichbar ist.
+
+### Endpoints
+
+| Endpoint | Beschreibung |
+|----------|--------------|
+| `GET /` | HTML-Seite mit anstehenden Terminen und Suchfunktion |
+| `GET /api/health` | Health Check (gibt `{"status": "ok"}` zurück) |
+| `GET /api/events?limit=10&search=...` | JSON-Liste zukünftiger Events (nicht gelöscht) |
+| `GET /api/events/{event_id}` | Einzelnes Event als JSON |
+
+### API Beispiel
+
+```bash
+# Alle anstehenden Events (max. 10)
+curl http://localhost:8000/api/events
+
+# Suche nach Titel
+curl "http://localhost:8000/api/events?search=Meeting&limit=5"
+
+# Einzelnes Event
+curl http://localhost:8000/api/events/42
+```
+
+### JSON Response Format
+
+```json
+{
+  "events": [
+    {
+      "id": 1,
+      "summary": "Teammeeting",
+      "description": "Wöchentliches Teammeeting",
+      "location": "Konferenzraum 1",
+      "start_at": "2025-01-15T10:00:00",
+      "end_at": "2025-01-15T11:00:00",
+      "all_day": false,
+      "status": "CONFIRMED"
+    }
+  ],
+  "count": 1,
+  "query_time": "2025-01-15T09:30:00Z"
+}
+```
 
 ## CI/CD
 

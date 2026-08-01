@@ -10,14 +10,20 @@ Python-basierter Google Calendar → MariaDB Synchronizer. Läuft als Docker Con
 
 - **Sprache**: Python 3.12
 - **Datenbank**: MariaDB (mysql-connector-python)
+- **API**: FastAPI + Uvicorn + Jinja2
 - **Docker**: Multi-Stage Build nicht verwendet, simples Slim-Image
-- **Dependencies**: requests, icalendar, recurring-ical-events, mysql-connector-python
+- **Dependencies**: requests, icalendar, recurring-ical-events, mysql-connector-python, fastapi, uvicorn, jinja2
 
 ## Projektstruktur
 
 ```
 .
 ├── sync.py              # Hauptskript (alles in einer Datei)
+├── api/
+│   ├── main.py          # FastAPI App (REST API + HTML UI)
+│   ├── database.py      # DB-Verbindung für die API
+│   └── templates/
+│       └── index.html   # Jinja2 Template für Web-UI
 ├── requirements.txt     # Python Dependencies
 ├── Dockerfile           # Docker Image Definition
 ├── docker-compose.yml   # Docker Compose Konfiguration
@@ -29,7 +35,16 @@ Python-basierter Google Calendar → MariaDB Synchronizer. Läuft als Docker Con
 ## Wichtige Hinweise
 
 ### Kein Framework
-Das Projekt verwendet kein Web-Framework. `sync.py` ist ein eigenständiges Python-Skript mit einer Endlosschleife (`main()` → `time.sleep()`).
+Das Projekt verwendet kein Web-Framework für den Sync-Teil. `sync.py` ist ein eigenständiges Python-Skript mit einer Endlosschleife (`main()` → `time.sleep()`).
+
+### FastAPI Applikation
+Die API (`api/main.py`) ist eine separarte FastAPI-App die als eigenständiger Container läuft:
+- **Web-UI**: `GET /` - Jinja2 Template mit anstehenden Termine und Suchfunktion
+- **REST API**: `GET /api/events` - JSON-Liste zukünftiger Events
+- **Einzeln-Event**: `GET /api/events/{id}` - Einzelnes Event als JSON
+- **Health Check**: `GET /api/health` - Gibt `{"status": "ok"}` zurück
+- Läuft über Uvicorn auf Port 8000
+- Teilt sich die Datenbank mit `sync.py`, verwendet aber eigene DB-Verbindung (`api/database.py`)
 
 ### Datenbank-Schema
 Schema wird in `ensure_schema()` per `CREATE TABLE IF NOT EXISTS` erstellt. Bei Schema-Änderungen:
