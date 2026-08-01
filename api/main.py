@@ -1,16 +1,21 @@
+import logging
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from api.database import get_connection
 
+log = logging.getLogger("calendar-api")
+
 app = FastAPI(title="Calendar Sync API")
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+
+SELECT_COLUMNS = "id, summary, description, location, start_at, end_at, all_day, status"
 
 
 class EventResponse(BaseModel):
@@ -43,6 +48,32 @@ def row_to_event(row) -> EventResponse:
     )
 
 
+def fetch_events(limit: int = 10, search: str | None = None) -> list[dict]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        try:
+            if search:
+                cur.execute(
+                    f"SELECT {SELECT_COLUMNS} FROM calendar_events "
+                    "WHERE deleted = 0 AND start_at >= NOW() AND summary LIKE %s "
+                    "ORDER BY start_at ASC LIMIT %s",
+                    (f"%{search}%", limit),
+                )
+            else:
+                cur.execute(
+                    f"SELECT {SELECT_COLUMNS} FROM calendar_events "
+                    "WHERE deleted = 0 AND start_at >= NOW() "
+                    "ORDER BY start_at ASC LIMIT %s",
+                    (limit,),
+                )
+            return cur.fetchall()
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -53,35 +84,11 @@ def get_events(
     limit: int = Query(default=10, ge=1, le=50),
     search: str | None = Query(default=None),
 ):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    if search:
-        cur.execute(
-            """
-            SELECT id, summary, description, location, start_at, end_at, all_day, status
-            FROM calendar_events
-            WHERE deleted = 0 AND start_at >= NOW() AND summary LIKE %s
-            ORDER BY start_at ASC
-            LIMIT %s
-            """,
-            (f"%{search}%", limit),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT id, summary, description, location, start_at, end_at, all_day, status
-            FROM calendar_events
-            WHERE deleted = 0 AND start_at >= NOW()
-            ORDER BY start_at ASC
-            LIMIT %s
-            """,
-            (limit,),
-        )
-
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    try:
+        rows = fetch_events(limit=limit, search=search)
+    except Exception:
+        log.exception("DB-Fehler bei /api/events")
+        raise HTTPException(status_code=500, detail="Database error")
 
     events = [row_to_event(row) for row in rows]
 
@@ -95,23 +102,24 @@ def get_events(
 @app.get("/api/events/{event_id}", response_model=EventResponse)
 def get_event(event_id: int):
     conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT id, summary, description, location, start_at, end_at, all_day, status
-        FROM calendar_events
-        WHERE id = %s AND deleted = 0
-        """,
-        (event_id,),
-    )
-
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                f"SELECT {SELECT_COLUMNS} FROM calendar_events "
+                "WHERE id = %s AND deleted = 0",
+                (event_id,),
+            )
+            row = cur.fetchone()
+        finally:
+            cur.close()
+    except Exception:
+        log.exception("DB-Fehler bei /api/events/%d", event_id)
+        raise HTTPException(status_code=500, detail="Database error")
+    finally:
+        conn.close()
 
     if not row:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Event not found")
 
     return row_to_event(row)
@@ -122,35 +130,11 @@ def index(
     search: str | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
 ):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    if search:
-        cur.execute(
-            """
-            SELECT id, summary, description, location, start_at, end_at, all_day, status
-            FROM calendar_events
-            WHERE deleted = 0 AND start_at >= NOW() AND summary LIKE %s
-            ORDER BY start_at ASC
-            LIMIT %s
-            """,
-            (f"%{search}%", limit),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT id, summary, description, location, start_at, end_at, all_day, status
-            FROM calendar_events
-            WHERE deleted = 0 AND start_at >= NOW()
-            ORDER BY start_at ASC
-            LIMIT %s
-            """,
-            (limit,),
-        )
-
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    try:
+        rows = fetch_events(limit=limit, search=search)
+    except Exception:
+        log.exception("DB-Fehler bei /")
+        raise HTTPException(status_code=500, detail="Database error")
 
     events = []
     for row in rows:
