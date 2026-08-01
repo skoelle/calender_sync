@@ -209,7 +209,7 @@ def ping_healthcheck():
 
 
 def run_sync_once():
-    run_ts = datetime.utcnow().replace(microsecond=0)
+    run_ts = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
     window_start = run_ts - timedelta(days=WINDOW_PAST_DAYS)
     window_end = run_ts + timedelta(days=WINDOW_FUTURE_DAYS)
 

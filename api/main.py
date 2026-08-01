@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -95,7 +95,7 @@ def get_events(
     return EventsListResponse(
         events=events,
         count=len(events),
-        query_time=datetime.utcnow().isoformat() + "Z",
+        query_time=datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z",
     )
 
 
