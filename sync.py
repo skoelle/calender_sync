@@ -18,6 +18,8 @@ import recurring_ical_events
 import mysql.connector
 from mysql.connector import Error as MySQLError
 
+from api.database import get_connection
+
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -76,17 +78,6 @@ def bootstrap_database():
         log.info("Bootstrap abgeschlossen")
     finally:
         root_conn.close()
-
-
-def get_connection():
-    return mysql.connector.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        autocommit=False,
-    )
 
 
 def ensure_schema(conn):
@@ -228,7 +219,7 @@ def run_sync_once():
     occurrences = expand_events(ics_bytes, window_start, window_end)
     log.info("ICS geladen, %d Instanzen im Fenster gefunden", len(occurrences))
 
-    conn = get_connection()
+    conn = get_connection(autocommit=False)
     try:
         ensure_schema(conn)
         cur = conn.cursor()

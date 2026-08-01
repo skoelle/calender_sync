@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY sync.py .
+COPY api/ ./api/
 
 ENV PYTHONUNBUFFERED=1
 
