@@ -1,0 +1,4 @@
+requests==2.32.3
+icalendar==6.1.0
+recurring-ical-events==3.4.1
+mysql-connector-python==9.1.0

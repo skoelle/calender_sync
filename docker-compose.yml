@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  calendar-sync:
+    image: ghcr.io/skoelle/calender_sync:latest
+    container_name: calendar-sync
+    restart: unless-stopped
+
+    environment:
+      - ICS_URL=${ICS_URL}
+      - CALENDAR_LABEL=${CALENDAR_LABEL:-privat}
+
+      - DB_HOST=${DB_HOST:-mariadb.fritz.box}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-calendar_sync}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+
+      - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES:-15}
+      - WINDOW_PAST_DAYS=${WINDOW_PAST_DAYS:-90}
+      - WINDOW_FUTURE_DAYS=${WINDOW_FUTURE_DAYS:-365}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+    networks:
+      - docker-backend
+
+networks:
+  docker-backend:
+    external: true
