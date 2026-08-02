@@ -124,6 +124,7 @@ def get_events(
         events=events,
         count=len(events),
         query_time=datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z",
+        timezone=TIMEZONE_NAME,  # <--- Add this line
     )
 
 
