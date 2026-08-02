@@ -24,7 +24,7 @@ Python-basiertes System zur Synchronisation eines Google Calendar ICS-Feeds nach
                └─────────────────┘
 ```
 
-**Entscheidung:** Gleicher Docker Build (ein Dockerfile), zwei verschiedene Container/Services via `docker-compose.yml`. Das Image wird mit einem `--entrypoint` Parameter gesteuert.
+**Entscheidung:** Gleicher Docker Build (ein Dockerfile), zwei verschiedene Container/Services via `docker-compose.yml`. Der jeweilige Service wird via `command` Parameter gesteuert (`python sync.py` vs. `uvicorn api.main:app`).
 
 ## 3. Bestehendes System (Sync Tool)
 
@@ -89,12 +89,14 @@ Gibt die nächsten N Termine zurück.
       "location": "Raum 101",
       "start_at": "2025-01-15T10:00:00",
       "end_at": "2025-01-15T11:00:00",
-      "all_day": false,
-      "status": "CONFIRMED"
-    }
-  ],
+       "all_day": false,
+       "status": "CONFIRMED",
+       "timezone": "Europe/Berlin"
+     }
+   ],
   "count": 10,
-  "query_time": "2025-01-14T14:30:00Z"
+  "query_time": "2025-01-14T14:30:00Z",
+  "timezone": "Europe/Berlin"
 }
 ```
 
@@ -123,12 +125,12 @@ Healthcheck Endpoint für den API Container.
 ### 4.3 Technologie-Stack (API)
 - **Framework:** FastAPI
 - **Templating:** Jinja2 (server-side rendering)
-- **DB-Zugriff:** mysql-connector-python (gleicher Connection-Pool wie Sync)
+- **DB-Zugriff:** mysql-connector-python (shared `get_connection()` aus `api/database.py`)
 - **Port:** 8000 (konfigurierbar via `API_PORT`)
 
 ### 4.4 Additional Environment Variablen (API)
 - `API_PORT` - Port für den API Server (default: 8000)
-- `API_HOST` - Bind Address (default: 0.0.0.0)
+- `TIMEZONE` - Zeitzone für die Anzeige von Zeiten (default: UTC)
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Identisch zum Sync
 
 ## 5. Docker Setup
@@ -174,6 +176,9 @@ services:
       - WINDOW_FUTURE_DAYS=${WINDOW_FUTURE_DAYS:-365}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - HEALTHCHECK_URL=${HEALTHCHECK_URL:-}
+      - DB_BOOTSTRAP=${DB_BOOTSTRAP:-false}
+      - DB_ROOT_USER=${DB_ROOT_USER:-}
+      - DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-}
     networks:
       - docker-backend
 
@@ -191,6 +196,7 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - TIMEZONE=${TIMEZONE:-UTC}
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
@@ -218,6 +224,8 @@ networks:
 ├── mariadb-setup.sql       # Manuelles DB-Setup Script
 ├── .env.example            # Beispiel-Umgebungsvariablen (erweitert)
 ├── SPEC.md                 # Diese Spezifikation
+├── PLAN.md                 # Implementierungsplan
+├── AGENTS.md               # Richtlinien für AI-Agenten
 └── .github/workflows/      # CI/CD (Docker Build + Push)
 ```
 
@@ -269,4 +277,4 @@ Bestehender GitHub Actions Workflow erweitern:
 ## 11. Future Enhancements (nicht im Scope)
 
 - [ ] Kalender-Filter UI (nach calendar_label)
-- [ ] Suchfunktion nach Event-Titel
+- [x] Suchfunktion nach Event-Titel (implementiert)

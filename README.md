@@ -70,6 +70,8 @@ Läuft als Docker Container, pollt periodisch einen privaten Google Calendar ICS
 | `DB_BOOTSTRAP` | `false` | DB + User beim Start erstellen |
 | `DB_ROOT_USER` | - | Root-User fürs Bootstrap |
 | `DB_ROOT_PASSWORD` | - | Root-Passwort fürs Bootstrap |
+| `API_PORT` | `8000` | Port für den API/Web-UI Container |
+| `TIMEZONE` | `UTC` | Zeitzone für API/Web-UI Anzeige (z.B. `Europe/Berlin`) |
 
 ## Datenbank-Schema
 
@@ -132,12 +134,14 @@ curl http://localhost:8000/api/events/42
       "location": "Konferenzraum 1",
       "start_at": "2025-01-15T10:00:00",
       "end_at": "2025-01-15T11:00:00",
-      "all_day": false,
-      "status": "CONFIRMED"
-    }
+       "all_day": false,
+       "status": "CONFIRMED",
+       "timezone": "Europe/Berlin"
+     }
   ],
   "count": 1,
-  "query_time": "2025-01-15T09:30:00Z"
+  "query_time": "2025-01-15T09:30:00Z",
+  "timezone": "Europe/Berlin"
 }
 ```
 

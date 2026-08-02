@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -76,25 +76,26 @@ def row_to_event(row) -> EventResponse:
     )
 
 
-def fetch_events(limit: int = 10, search: str | None = None) -> list[dict]:
+def fetch_events(limit: int = 10, search: str | None = None, calendar_label: str | None = None) -> list[dict]:
     conn = get_connection()
     try:
         cur = conn.cursor()
         try:
+            conditions = ["deleted = 0", "start_at >= NOW()"]
+            params: list = []
             if search:
-                cur.execute(
-                    f"SELECT {SELECT_COLUMNS} FROM calendar_events "
-                    "WHERE deleted = 0 AND start_at >= NOW() AND summary LIKE %s "
-                    "ORDER BY start_at ASC LIMIT %s",
-                    (f"%{search}%", limit),
-                )
-            else:
-                cur.execute(
-                    f"SELECT {SELECT_COLUMNS} FROM calendar_events "
-                    "WHERE deleted = 0 AND start_at >= NOW() "
-                    "ORDER BY start_at ASC LIMIT %s",
-                    (limit,),
-                )
+                conditions.append("summary LIKE %s")
+                params.append(f"%{search}%")
+            if calendar_label:
+                conditions.append("calendar_label = %s")
+                params.append(calendar_label)
+            params.append(limit)
+            where = " WHERE " + " AND ".join(conditions)
+            cur.execute(
+                f"SELECT {SELECT_COLUMNS} FROM calendar_events "
+                f"{where} ORDER BY start_at ASC LIMIT %s",
+                tuple(params),
+            )
             return cur.fetchall()
         finally:
             cur.close()
@@ -111,9 +112,10 @@ def health():
 def get_events(
     limit: int = Query(default=10, ge=1, le=50),
     search: str | None = Query(default=None),
+    calendar_label: str | None = Query(default=None),
 ):
     try:
-        rows = fetch_events(limit=limit, search=search)
+        rows = fetch_events(limit=limit, search=search, calendar_label=calendar_label)
     except Exception:
         log.exception("DB-Fehler bei /api/events")
         raise HTTPException(status_code=500, detail="Database error")
@@ -156,6 +158,7 @@ def get_event(event_id: int):
 
 @app.get("/", response_class=HTMLResponse)
 def index(
+    request: Request,
     search: str | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
 ):
@@ -181,5 +184,5 @@ def index(
 
     return templates.TemplateResponse(
         "index.html",
-        {"request": {}, "events": events, "search": search or ""},
+        {"request": request, "events": events, "search": search or ""},
     )

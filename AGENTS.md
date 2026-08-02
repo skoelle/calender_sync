@@ -48,7 +48,7 @@ Die API (`api/main.py`) ist eine separarte FastAPI-App die als eigenständiger C
 
 ### Datenbank-Schema
 Schema wird in `ensure_schema()` per `CREATE TABLE IF NOT EXISTS` erstellt. Bei Schema-Änderungen:
-- `ensure_schema()` in `sync.py:91` anpassen
+- `ensure_schema()` in `sync.py:83` anpassen
 - MariaDB-kompatibles SQL verwenden (kein PostgreSQL-Specific)
 - Indexe für Performance bedenken
 
@@ -56,7 +56,7 @@ Schema wird in `ensure_schema()` per `CREATE TABLE IF NOT EXISTS` erstellt. Bei 
 Verwendet `recurring_ical_events` Bibliothek für RRULE/EXDATE/RECURRENCE-ID Expansion. Fenster wird über `WINDOW_PAST_DAYS`/`WINDOW_FUTURE_DAYS` gesteuert.
 
 ### UTC-Normalisierung
-Alle Zeiten werden in naive UTC datetime konvertiert (`to_naive_utc()`). Bei Datumsänderungen sicherstellen, dass Zeitzone korrekt处理 wird.
+Alle Zeiten werden in naive UTC datetime konvertiert (`to_naive_utc()`). Bei Datumsänderungen sicherstellen, dass die Zeitzone korrekt verarbeitet wird.
 
 ### Soft-Delete
 Events werden nicht gelöscht, sondern mit `deleted=1` markiert (`mark_missing_as_deleted()`).

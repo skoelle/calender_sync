@@ -22,6 +22,9 @@ services:
       - WINDOW_FUTURE_DAYS=${WINDOW_FUTURE_DAYS:-365}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - HEALTHCHECK_URL=${HEALTHCHECK_URL:-}
+      - DB_BOOTSTRAP=${DB_BOOTSTRAP:-false}
+      - DB_ROOT_USER=${DB_ROOT_USER:-}
+      - DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-}
 
     networks:
       - docker-backend
