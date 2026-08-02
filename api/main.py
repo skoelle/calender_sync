@@ -1,6 +1,8 @@
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -17,6 +19,29 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 SELECT_COLUMNS = "id, summary, description, location, start_at, end_at, all_day, status"
 
+# Get timezone from environment, default to UTC
+TIMEZONE_NAME = os.environ.get("TIMEZONE", "UTC")
+try:
+    TIMEZONE = ZoneInfo(TIMEZONE_NAME)
+except Exception:
+    log.warning(f"Invalid TIMEZONE '{TIMEZONE_NAME}', falling back to UTC")
+    TIMEZONE = ZoneInfo("UTC")
+
+
+def to_local_timezone(dt: datetime) -> datetime:
+    """Konvertiere naive UTC datetime zu Benutzer-Zeitzone."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc).astimezone(TIMEZONE)
+
+
+def to_iso_local(dt: datetime) -> str:
+    """Konvertiere naive UTC datetime zu ISO-String in lokaler Zeitzone."""
+    if dt is None:
+        return None
+    local_dt = to_local_timezone(dt)
+    return local_dt.isoformat()
+
 
 class EventResponse(BaseModel):
     id: int
@@ -25,6 +50,7 @@ class EventResponse(BaseModel):
     location: str | None
     start_at: str
     end_at: str | None
+    timezone: str
     all_day: bool
     status: str
 
@@ -33,6 +59,7 @@ class EventsListResponse(BaseModel):
     events: list[EventResponse]
     count: int
     query_time: str
+    timezone: str
 
 
 def row_to_event(row) -> EventResponse:
@@ -41,8 +68,9 @@ def row_to_event(row) -> EventResponse:
         summary=row[1],
         description=row[2],
         location=row[3],
-        start_at=row[4].isoformat() if row[4] else None,
-        end_at=row[5].isoformat() if row[5] else None,
+        start_at=to_iso_local(row[4]) if row[4] else None,
+        end_at=to_iso_local(row[5]) if row[5] else None,
+        timezone=TIMEZONE_NAME,
         all_day=bool(row[6]),
         status=row[7],
     )
@@ -143,8 +171,9 @@ def index(
             "summary": row[1],
             "description": row[2],
             "location": row[3],
-            "start_at": row[4],
-            "end_at": row[5],
+            "start_at": to_iso_local(row[4]) if row[4] else None,
+            "end_at": to_iso_local(row[5]) if row[5] else None,
+            "timezone": TIMEZONE_NAME,
             "all_day": bool(row[6]),
             "status": row[7],
         })

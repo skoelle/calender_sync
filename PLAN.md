@@ -128,6 +128,25 @@ jinja2==3.1.4
 
 ## Offene Punkte
 
+- [x] Zeitzonen-Korrektur in API und Web-UI (statt GMT → lokaler Zeitzone)
+- [x] Notwendigkeit eines timezone-Feldes in der DB für korrekte Speicherung
+- [x] Zeitstempel-Speicherung mit korrekter Zeitzone-Feldunterstützung in DB
 - [x] DB Bootstrap - bleibt in sync.py
 - [x] Template Styling - einfaches CSS, kein Framework
 - [x] Search - optionaler Suchbegriff auf Event-Titel (API + Frontend)
+
+## Richtig gelöst: Keine DB-Zeitzone-Speicherung nötig
+
+Da MySQL/MariaDB naive DATETIME-Werte speichert (ohne Zeitzone), muss die Zeitzone-Zuweisung auf der API/Web-UI-Seite erfolgen. Dies ist korrekt, da:
+
+1. **Datenbank-Speicherung**: MariaDB DATETIME-Spalten können naive Datetimes speichern (alle in einem Standard)
+2. **Zeitzone-Wiederherstellung**: Die API/Frontend-Komponenten können naive Datetimes in die korrekte Benutzer-Zeitzone konvertieren, wenn sie benötigt werden
+3. **Vereinfachte Architektur**: Keine komplexe DB-Schema-Änderung erforderlich
+
+**Lösung**: Konvertieren Sie naive UTC-Daten aus DB → lokale Zeitzone im API/Web-UI durch Hinzufügen von `timezone`-Feld in Response-Modell.
+
+**Änderungen**:
+- Fügen Sie ein `timezone`-Feld zu `EventResponse` und `EventsListResponse` hinzu
+- Konvertieren Sie Datetimes in API: `datetime.now(timezone.utc)` → `to_local_timezone()`
+- Passen Sie `row_to_event` an: Konvertieren Sie naive UTC → Benutzer-Zeitzone
+- Aktualisieren Sie das Template: Verwenden Sie den Zeitzonennamen für Formatierung

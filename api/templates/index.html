@@ -116,7 +116,7 @@
         }
 
         .event-location::before {
-            content: "\1F4CD ";
+            content: "\\1F4CD ";
         }
 
         .badge {
@@ -181,11 +181,11 @@
                         <div>
                             <div class="event-date">
                                 {% if event.all_day %}
-                                    {{ event.start_at.strftime('%d.%m.%Y') }} <span class="all-day">Ganztägig</span>
+                                    {{ event.start_at.split('T')[0] }} <span class="all-day">Ganztägig</span>
                                 {% elif event.end_at %}
-                                    {{ event.start_at.strftime('%d.%m.%Y %H:%M') }} - {{ event.end_at.strftime('%H:%M') }}
+                                    {{ event.start_at.split('T')[0] }} {{ event.start_at.split('T')[1][:5] }} - {{ event.end_at.split('T')[1][:5] }} {{ event.timezone }}
                                 {% else %}
-                                    {{ event.start_at.strftime('%d.%m.%Y %H:%M') }}
+                                    {{ event.start_at.split('T')[0] }} {{ event.start_at.split('T')[1][:5] }} {{ event.timezone }}
                                 {% endif %}
                             </div>
                             <div class="event-summary">{{ event.summary or '(Kein Titel)' }}</div>
