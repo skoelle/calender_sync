@@ -187,4 +187,4 @@ ghcr.io/skoelle/calender_sync:latest
 
 ## Lizenz
 
-Keine Lizenz angegeben.
+Lizenziert unter der [MIT License](LICENSE) - Copyright (c) 2026 Stefan Koelle (https://stefankoelle.de)

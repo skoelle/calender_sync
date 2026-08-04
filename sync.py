@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Stefan Koelle (https://stefankoelle.de)
+# Licensed under the MIT License. See LICENSE file in project root for details.
 """
 Google Calendar (privater ICS-Feed) -> MariaDB Sync
 Homelab: laeuft als Docker Container, pollt periodisch, expandiert RRULE/EXDATE/RECURRENCE-ID

@@ -114,3 +114,9 @@ GitHub Actions Workflow:
 - Baut Docker Image bei Push zu `main`
 - Published nach `ghcr.io/skoelle/calender_sync:latest`
 - Keine Tests im Workflow (derzeit)
+
+## Lizenz
+
+MIT License - Copyright (c) 2026 Stefan Koelle (https://stefankoelle.de)
+- Vollständiger Text in `LICENSE`
+- Lizenz-Header in allen Python-Dateien
