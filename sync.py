@@ -10,7 +10,11 @@ import sys
 import time
 import logging
 import hashlib
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import requests
 import icalendar
@@ -44,6 +48,16 @@ HEALTHCHECK_URL = os.environ.get("HEALTHCHECK_URL", "")
 DB_BOOTSTRAP = os.environ.get("DB_BOOTSTRAP", "false").lower() == "true"
 DB_ROOT_USER = os.environ.get("DB_ROOT_USER")
 DB_ROOT_PASSWORD = os.environ.get("DB_ROOT_PASSWORD")
+
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", "")
+SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "true").lower() == "true"
+NOTIFY_EMAIL = os.environ.get("NOTIFY_EMAIL", "")
+NOTIFY_TIME = int(os.environ.get("NOTIFY_TIME", "6"))
+NOTIFY_TIMEZONE = os.environ.get("NOTIFY_TIMEZONE", "Europe/Berlin")
 
 
 def bootstrap_database():
@@ -104,6 +118,15 @@ def ensure_schema(conn):
             UNIQUE KEY uq_instance (calendar_label, instance_key),
             INDEX idx_start (start_at),
             INDEX idx_deleted (deleted)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS daily_notification_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            notify_date DATE NOT NULL,
+            sent_at DATETIME NOT NULL,
+            event_count INT NOT NULL,
+            UNIQUE KEY uk_date (notify_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """)
     conn.commit()
@@ -198,6 +221,137 @@ def mark_missing_as_deleted(cur, calendar_label, run_ts, window_start, window_en
     return cur.rowcount
 
 
+def get_today_events(conn, calendar_label):
+    tz = ZoneInfo(NOTIFY_TIMEZONE)
+    now = datetime.now(tz)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+
+    today_start_naive = today_start.replace(tzinfo=None)
+    today_end_naive = today_end.replace(tzinfo=None)
+
+    cur = conn.cursor(dictionary=True)
+    cur.execute(
+        """
+        SELECT summary, start_at, end_at, location
+        FROM calendar_events
+        WHERE calendar_label = %s
+          AND deleted = 0
+          AND all_day = 0
+          AND start_at >= %s
+          AND start_at < %s
+        ORDER BY start_at ASC
+        """,
+        (calendar_label, today_start_naive, today_end_naive),
+    )
+    events = cur.fetchall()
+    cur.close()
+    return events
+
+
+def should_notify(conn):
+    tz = ZoneInfo(NOTIFY_TIMEZONE)
+    now = datetime.now(tz)
+
+    if now.hour != NOTIFY_TIME:
+        return False
+
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT COUNT(*) FROM daily_notification_log WHERE notify_date = CURDATE()"
+    )
+    count = cur.fetchone()[0]
+    cur.close()
+    return count == 0
+
+
+def log_notification(conn, event_count):
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO daily_notification_log (notify_date, sent_at, event_count) VALUES (CURDATE(), NOW(), %s)",
+        (event_count,),
+    )
+    conn.commit()
+    cur.close()
+
+
+def format_event_time(start_at, end_at):
+    tz = ZoneInfo(NOTIFY_TIMEZONE)
+    start_local = start_at.replace(tzinfo=timezone.utc).astimezone(tz)
+    start_str = start_local.strftime("%H:%M")
+    if end_at:
+        end_local = end_at.replace(tzinfo=timezone.utc).astimezone(tz)
+        end_str = end_local.strftime("%H:%M")
+        return f"{start_str} - {end_str}"
+    return start_str
+
+
+def send_notification(events):
+    if not SMTP_HOST or not NOTIFY_EMAIL:
+        log.warning("SMTP-Konfiguration unvollstaendig, ueberspringe Benachrichtigung")
+        return
+
+    tz = ZoneInfo(NOTIFY_TIMEZONE)
+    now = datetime.now(tz)
+    date_str = now.strftime("%d.%m.%Y")
+    count = len(events)
+
+    if count == 1:
+        event = events[0]
+        time_str = format_event_time(event["start_at"], event.get("end_at"))
+        subject = f"Kalender heute: {time_str} - {event['summary']}"
+    else:
+        subject = f"Kalender heute: {count} Termine"
+
+    event_rows = ""
+    for event in events:
+        time_str = format_event_time(event["start_at"], event.get("end_at"))
+        summary = event["summary"]
+        location = f" ({event['location']})" if event.get("location") else ""
+        event_rows += f"""
+        <tr>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-weight: bold; white-space: nowrap;">{time_str}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{summary}{location}</td>
+        </tr>"""
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #333;">Guten Morgen!</h2>
+        <p style="color: #555;">Heute, <strong>{date_str}</strong>, stehen folgende Termine an:</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #f9f9f9; border-radius: 8px; overflow: hidden;">
+            {event_rows}
+        </table>
+        <p style="color: #888; font-size: 12px;">Viel Erfolg heute!</p>
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = SMTP_FROM
+    msg["To"] = NOTIFY_EMAIL
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        if SMTP_USE_TLS:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+            server.starttls()
+        else:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
+
+        if SMTP_USER and SMTP_PASSWORD:
+            server.login(SMTP_USER, SMTP_PASSWORD)
+
+        server.sendmail(SMTP_FROM, [NOTIFY_EMAIL], msg.as_string())
+        server.quit()
+        log.info("Benachrichtigung gesendet: %s", subject)
+    except Exception:
+        log.exception("Fehler beim Senden der Benachrichtigung")
+
+
 def ping_healthcheck():
     if not HEALTHCHECK_URL:
         return
@@ -238,15 +392,37 @@ def run_sync_once():
         conn.close()
 
 
+def check_and_send_notification():
+    if not SMTP_HOST or not NOTIFY_EMAIL:
+        return
+
+    conn = get_connection(autocommit=True)
+    try:
+        if should_notify(conn):
+            events = get_today_events(conn, CALENDAR_LABEL)
+            if events:
+                send_notification(events)
+                log_notification(conn, len(events))
+                log.info("Tagesbenachrichtigung fuer %d Events gesendet", len(events))
+            else:
+                log.info("Keine Termine heute, Benachrichtigung wird uebersprungen")
+    except Exception:
+        log.exception("Fehler bei der Tagesbenachrichtigung")
+    finally:
+        conn.close()
+
+
 def main():
     bootstrap_database()
     log.info(
-        "calendar-sync gestartet | Intervall=%smin | Fenster=-%dd/+%dd",
+        "calendar-sync gestartet | Intervall=%smin | Fenster=-%dd/+%dd | Benachrichtigung um %s:00 %s",
         SYNC_INTERVAL_MINUTES, WINDOW_PAST_DAYS, WINDOW_FUTURE_DAYS,
+        NOTIFY_TIME, NOTIFY_TIMEZONE,
     )
     while True:
         try:
             run_sync_once()
+            check_and_send_notification()
         except Exception:
             log.exception("Sync-Durchlauf fehlgeschlagen, versuche es beim naechsten Intervall erneut")
         time.sleep(SYNC_INTERVAL_MINUTES * 60)

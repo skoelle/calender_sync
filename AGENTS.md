@@ -61,6 +61,14 @@ Alle Zeiten werden in naive UTC datetime konvertiert (`to_naive_utc()`). Bei Dat
 ### Soft-Delete
 Events werden nicht gelöscht, sondern mit `deleted=1` markiert (`mark_missing_as_deleted()`).
 
+### Tägliche E-Mail-Benachrichtigung
+Sendet täglich um konfigurierte Uhrzeit eine HTML-Email mit anstehenden Terminen:
+- Nur Termine mit Uhrzeit (`all_day=0`), keine Ganztagstermine
+- Subject: Bei 1 Termin direkt "Kalender heute: HH:MM - Termin", bei mehreren "Kalender heute: X Termine"
+- Tracking via `daily_notification_log` Tabelle (verhindert Doppelversand)
+- Konfiguration über SMTP_* und NOTIFY_* Umgebungsvariablen
+- Funktionen: `get_today_events()`, `should_notify()`, `send_notification()`, `log_notification()`
+
 ## Entwicklung
 
 ### Lokaler Test

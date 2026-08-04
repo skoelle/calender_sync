@@ -13,6 +13,7 @@ Läuft als Docker Container, pollt periodisch einen privaten Google Calendar ICS
 - Zeitfenster-konfiguration für Vergangenheit/Future (standardmäßig -90 Tage / +365 Tage)
 - Web-UI zur Anzeige anstehender Termine mit Suchfunktion
 - REST API für programmsprachigen Zugriff auf Kalenderdaten
+- Optionale tägliche E-Mail-Benachrichtigung um konfigurierte Uhrzeit
 
 ## Voraussetzungen
 
@@ -73,6 +74,28 @@ Läuft als Docker Container, pollt periodisch einen privaten Google Calendar ICS
 | `API_PORT` | `8000` | Port für den API/Web-UI Container |
 | `TIMEZONE` | `UTC` | Zeitzone für API/Web-UI Anzeige (z.B. `Europe/Berlin`) |
 
+### Optionale E-Mail-Benachrichtigung
+
+Sendet täglich eine HTML-Email mit den anstehenden Terminen. Wird aktiviert wenn `SMTP_HOST` und `NOTIFY_EMAIL` gesetzt sind.
+
+| Variable | Default | Beschreibung |
+|----------|---------|--------------|
+| `SMTP_HOST` | - | SMTP Server Hostname |
+| `SMTP_PORT` | `587` | SMTP Server Port |
+| `SMTP_USER` | - | SMTP Login Username |
+| `SMTP_PASSWORD` | - | SMTP Login Passwort |
+| `SMTP_FROM` | - | Absender E-Mail Adresse |
+| `SMTP_USE_TLS` | `true` | TLS verschlüsselung nutzen |
+| `NOTIFY_EMAIL` | - | Empfänger E-Mail Adresse |
+| `NOTIFY_TIME` | `6` | Uhrzeit für Benachrichtigung (Stunde, 0-23) |
+| `NOTIFY_TIMEZONE` | `Europe/Berlin` | Zeitzone für die Benachrichtigung |
+
+**Subject-Logik:**
+- 1 Termin: `Kalender heute: 09:00 - Meeting mit Team`
+- 2+ Termine: `Kalender heute: 3 Termine`
+
+**Hinweis:** Ganztagstermine werden nicht in der Benachrichtigung berücksichtigt.
+
 ## Datenbank-Schema
 
 Tabelle `calendar_events`:
@@ -95,6 +118,15 @@ Tabelle `calendar_events`:
 | `last_seen_at` | DATETIME | Letzte Synchronisation |
 | `created_at` | DATETIME | Erstellungszeitpunkt |
 | `updated_at` | DATETIME | Letzte Änderung |
+
+Tabelle `daily_notification_log` (optional, für E-Mail-Benachrichtigung):
+
+| Spalte | Typ | Beschreibung |
+|--------|-----|--------------|
+| `id` | INT PK | Auto-Increment |
+| `notify_date` | DATE | Datum der Benachrichtigung |
+| `sent_at` | DATETIME | Zeitpunkt des Versands |
+| `event_count` | INT | Anzahl Termine in der Email |
 
 ## Web-UI & API
 
